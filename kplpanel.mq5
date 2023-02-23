@@ -11,8 +11,8 @@
 #property icon   "files\kpl.ico"
 
 input string TELEGRAM = "---------------Enter Telegram Group Details---------------";
-input const string TelegramBotToken = "5532301710:AAHZVjSUmJYaSIStWgDaHNeC_Kr9oQEWCgk";
-input const string ChatId           = "-1001877433883";
+input const string TelegramBotToken = "bot id";
+input const string ChatId           = "telegram group ID";
 const string TelegramApiUrl   = "https://api.telegram.org"; // Add this to Allow URLs
 
 const int    UrlDefinedError  = 4014; // Because MT4 and MT5 are different
