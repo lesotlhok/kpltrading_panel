@@ -6,13 +6,13 @@
 
 #property copyright "Copyright 2022, lesotlhok"
 #property link      "https://www.linkedin.com/in/koorapetselesotlho/"
-#property version   "2"
+#property version   "1.6"
 #property description "Trading in financial markets involves inherent risks and potential for loss. It is important to carefully consider your financial resources and risk tolerance before making any trades. It is also important to use leverage responsibly and maintain realistic profit expectations. Having a clear trading plan and being able to control your emotions can help mitigate some of the risks associated with trading."
 #property icon   "files\kpl.ico"
 
 input string TELEGRAM = "---------------Enter Telegram Group Details---------------";
-input const string TelegramBotToken = "input bot token";
-input const string ChatId           = "channelID";
+input const string TelegramBotToken = "5532301710:AAHZVjSUmJYaSIStWgDaHNeC_Kr9oQEWCgk";
+input const string ChatId           = "-1001877433883";
 const string TelegramApiUrl   = "https://api.telegram.org"; // Add this to Allow URLs
 
 const int    UrlDefinedError  = 4014; // Because MT4 and MT5 are different
@@ -20,6 +20,12 @@ const int    UrlDefinedError  = 4014; // Because MT4 and MT5 are different
 
 #include <Trade/Trade.mqh>
 CTrade                 Trade;
+
+#include <Trade/DealInfo.mqh>
+//---
+CDealInfo      m_deal;                       // object of CDealInfo class
+
+
 
 // Set the initial corner for the trade panel
 const ENUM_BASE_CORNER PanelCorner  = CORNER_RIGHT_UPPER;
@@ -83,7 +89,12 @@ void OnDeinit(const int reason) {
 
 }
 
-void OnTick() {}
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnTick() {
+
+}
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -144,7 +155,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 
          }        // Save a screen shot
          ChartRedraw(); // Make sure the chart is up to date
-         ChartScreenShot( 0, "MyScreenshot.png",  1228, 720 , ALIGN_CENTER );
+         ChartScreenShot( 0, "MyScreenshot.png",  1228, 720, ALIGN_CENTER );
 
          SendTelegramMessage( TelegramApiUrl, TelegramBotToken, ChatId, "KPL COMMUNITY" + "  TRADE TYPE:  SELL   " + "Timeframe: " + StringSubstr(EnumToString(_Period), 7) + " Symbol: " + _Symbol + " Time Taken: " + TimeToString( TimeLocal() ), "MyScreenshot.png" );
 
@@ -156,7 +167,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 
          for(int i = PositionsTotal(); i >= 0; i--) {
 
-            int ticket = PositionGetTicket(i);
+            ulong ticket = PositionGetTicket(i);
 
             if( PositionSelect(_Symbol) == true) {
                Trade.PositionClose(_Symbol);
@@ -166,7 +177,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
 
          }
          ChartRedraw(); // Make sure the chart is up to date
-         ChartScreenShot( 0, "MyScreenshot.png",  1228, 720 , ALIGN_CENTER );
+         ChartScreenShot( 0, "MyScreenshot.png",  1228, 720, ALIGN_CENTER );
          SendTelegramMessage( TelegramApiUrl, TelegramBotToken, ChatId, "KPL COMMUNITY" + " Trade Closed   " + "Timeframe: " + StringSubstr(EnumToString(_Period), 7) + " Symbol: " + _Symbol + " Time Taken: " + TimeToString( TimeLocal() ), "MyScreenshot.png" );
 
       }
@@ -221,6 +232,50 @@ void SetTradeNumber(string newNum_Trade) {
 //+------------------------------------------------------------------+
 //|                                                                  |
 //+------------------------------------------------------------------+
+void OnTradeTransaction(const MqlTradeTransaction& trans, const MqlTradeRequest& request, const MqlTradeResult& result) {
+//--- get transaction type as enumeration value
+   ENUM_TRADE_TRANSACTION_TYPE type = trans.type;
+//--- if transaction is result of addition of the transaction in history
+   if(type == TRADE_TRANSACTION_DEAL_ADD) {
+      if(HistoryDealSelect(trans.deal))
+         m_deal.Ticket(trans.deal);
+      else {
+         Print(__FILE__, " ", __FUNCTION__, ", ERROR: HistoryDealSelect(", trans.deal, ")");
+         return;
+      }
+      //---
+      long reason = -1;
+      if(!m_deal.InfoInteger(DEAL_REASON, reason)) {
+         Print(__FILE__, " ", __FUNCTION__, ", ERROR: InfoInteger(DEAL_REASON,reason)");
+         return;
+      }
+      if((ENUM_DEAL_REASON)reason == DEAL_REASON_SL && m_deal.Symbol() == _Symbol) {
+         Alert("Stop Loss activation");
+
+
+         ChartRedraw(); // Make sure the chart is up to date
+         ChartScreenShot( 0, "MyScreenshot.png",  1228, 720, ALIGN_CENTER );
+
+         SendTelegramMessage( TelegramApiUrl, TelegramBotToken, ChatId, "KPL COMMUNITY" + "  TRADE STOPLOSS HIT" + " Symbol: " + _Symbol + " Time Taken: " + TimeToString( TimeTradeServer() ), "MyScreenshot.png" );
+
+      }
+
+      else if((ENUM_DEAL_REASON)reason == DEAL_REASON_TP && m_deal.Symbol() == _Symbol ) {
+         ChartRedraw(); // Make sure the chart is up to date
+         ChartScreenShot( 0, "MyScreenshot.png",  1228, 720, ALIGN_CENTER );
+
+         SendTelegramMessage( TelegramApiUrl, TelegramBotToken, ChatId, "KPL COMMUNITY" + "  TRADE TAKEPROFIT HIT" + " Symbol: " + _Symbol + " Time Taken: " + TimeToString( TimeTradeServer() ), "MyScreenshot.png" );
+
+
+
+      }
+
+   }
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
 bool OpenTrade(ENUM_ORDER_TYPE type, double volume ) {
 
 
@@ -230,6 +285,8 @@ bool OpenTrade(ENUM_ORDER_TYPE type, double volume ) {
 
 
 }
+
+
 
 //+------------------------------------------------------------------+
 //|                                                                  |
@@ -420,7 +477,7 @@ bool SendTelegramMessage( string url, string token, string chat, string text,
    return ( response == 200 );
 }
 
-bool GetPostData( char &postData[], string &headers, string chat, string text, string fileName ) {
+bool GetPostData( char &postData[], string & headers, string chat, string text, string fileName ) {
 
    ResetLastError();
 
@@ -456,7 +513,7 @@ bool GetPostData( char &postData[], string &headers, string chat, string text, s
    return ( true );
 }
 
-void AddPostData( uchar &data[], string &hash, string key = "", string value = "" ) {
+void AddPostData( uchar & data[], string & hash, string key = "", string value = "" ) {
 
    uchar valueArr[];
    StringToCharArray( value, valueArr, 0, StringLen( value ) );
@@ -465,7 +522,7 @@ void AddPostData( uchar &data[], string &hash, string key = "", string value = "
    return;
 }
 
-void AddPostData( uchar &data[], string &hash, string key, uchar &value[], string fileName = "" ) {
+void AddPostData( uchar & data[], string & hash, string key, uchar & value[], string fileName = "" ) {
 
    if ( hash == "" ) {
       hash = Hash();
@@ -487,7 +544,7 @@ void AddPostData( uchar &data[], string &hash, string key, uchar &value[], strin
    return;
 }
 
-void ArrayCopy( uchar &dst[], string src ) {
+void ArrayCopy( uchar & dst[], string src ) {
 
    uchar srcArray[];
    StringToCharArray( src, srcArray, 0, StringLen( src ) );
@@ -507,4 +564,6 @@ string Hash() {
 
    return ( hash );
 }
+//+------------------------------------------------------------------+
+
 //+------------------------------------------------------------------+
